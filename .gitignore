@@ -1,0 +1,32 @@
+# Dataset (Large files, do not commit)
+Data/
+data/
+
+# Python & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.ipynb_checkpoints/
+
+# PlatformIO & Embedded build files
+.pio/
+.cache/
+compile_commands.json
+
+# C++ Build artifacts
+build/
+bin/
+*.o
+*.obj
+*.exe
+
+# IDE files
+.vscode/
+.idea/
+
+# Local OS files
+.DS_Store
+Thumbs.db
