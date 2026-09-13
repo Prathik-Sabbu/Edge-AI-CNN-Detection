@@ -137,30 +137,42 @@ class EdgeAISystem:
         save_path = self.captures_dir / f"{timestamp}_{safe_label}_{int(confidence*100)}pct.jpg"
         try:
             annotated = frame.copy()
+            x1, y1, x2, y2 = 0, 0, frame.shape[1], frame.shape[0]
+
             if getattr(config, "ENABLE_ROI_CROP", True):
                 _, (x1, y1, x2, y2) = AnimalClassifier.crop_roi(
                     frame, getattr(config, "ROI_CROP_SCALE", 1.0)
                 )
-                cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 2)
-                cv2.putText(
-                    annotated,
-                    "ROI Cropped Area",
-                    (x1 + 10, y1 + 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 255, 255),
-                    2,
-                )
 
-            hud_color = (0, 255, 0) if confidence >= config.CONFIDENCE_THRESHOLD else (0, 165, 255)
+            # Object detection bounding box color: Green if high confidence, Orange if moderate
+            box_color = (0, 230, 0) if confidence >= config.CONFIDENCE_THRESHOLD else (0, 140, 255)
+            line_thickness = 3
+
+            # Draw outer object bounding box
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), box_color, line_thickness)
+
+            # Create filled label banner attached to top of the bounding box
+            label_text = f"{label} {confidence:.0%}"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.8
+            font_thickness = 2
+            (text_w, text_h), baseline = cv2.getTextSize(label_text, font, font_scale, font_thickness)
+
+            # Position badge above box if space permits, otherwise inside top
+            badge_y1 = max(0, y1 - text_h - 12)
+            badge_y2 = badge_y1 + text_h + 12
+            badge_x2 = min(frame.shape[1], x1 + text_w + 16)
+
+            cv2.rectangle(annotated, (x1, badge_y1), (badge_x2, badge_y2), box_color, -1)
             cv2.putText(
                 annotated,
-                f"{label}: {confidence:.1%}",
-                (30, 50),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1.0,
-                hud_color,
-                2,
+                label_text,
+                (x1 + 8, badge_y2 - 8),
+                font,
+                font_scale,
+                (0, 0, 0),  # Black text for high contrast on bright badge
+                font_thickness,
+                cv2.LINE_AA,
             )
 
             cv2.imwrite(str(save_path), annotated)
