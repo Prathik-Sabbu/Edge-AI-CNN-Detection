@@ -1,0 +1,19 @@
+[Unit]
+Description=Raspberry Pi Edge AI CNN Detection Daemon
+After=network.target multi-user.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/rpi_system
+ExecStart=/home/pi/rpi_system/venv/bin/python main.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Hardware access permissions
+SupplementaryGroups=dialout video gpio
+
+[Install]
+WantedBy=multi-user.target
