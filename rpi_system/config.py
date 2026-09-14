@@ -9,7 +9,10 @@ from pathlib import Path
 # Base Paths
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
-DATA_DIR = PROJECT_ROOT / "Data"
+DATA_DIR = PROJECT_ROOT / "Data" / "Testing" / "raw-img"
+TRAIN_DIR = DATA_DIR
+VAL_DIR = DATA_DIR
+INF_DIR = PROJECT_ROOT / "Data" / "inf"
 MODELS_DIR = BASE_DIR / "models"
 MODEL_PATH = str(MODELS_DIR / "animal_classifier.tflite")
 LABELS_PATH = str(MODELS_DIR / "labels.txt")
@@ -24,9 +27,9 @@ CONFIDENCE_THRESHOLD = 0.50
 TOP_K = 1
 
 # Training Hyperparameters
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 TRAIN_BATCH_SIZE = BATCH_SIZE
-EPOCHS = 20
+EPOCHS = 30
 TRAIN_EPOCHS = EPOCHS
 LEARNING_RATE = 0.001
 TRAIN_LEARNING_RATE = LEARNING_RATE
