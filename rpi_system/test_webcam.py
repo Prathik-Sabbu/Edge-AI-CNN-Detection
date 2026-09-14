@@ -99,6 +99,31 @@ def run_webcam_test():
             cv2.LINE_AA,
         )
 
+        # 7. Helper banner & CNN Receptive Field Inset (PiP)
+        # Shows user the exact patch the CNN sees so they can align phone/photo properly
+        pip_size = 140
+        pip_img = cv2.resize(roi, (pip_size, pip_size))
+        frame[15 : 15 + pip_size, w - pip_size - 15 : w - 15] = pip_img
+        cv2.rectangle(frame, (w - pip_size - 15, 15), (w - 15, 15 + pip_size), (0, 255, 255), 2)
+        cv2.putText(frame, "CNN Input Feed", (w - pip_size - 10, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
+
+        # Live probabilities panel on left
+        for idx, (lbl, prob) in enumerate(zip(labels, output)):
+            txt = f"{lbl}: {prob * 100:.1f}%"
+            c = (0, 255, 0) if idx == top_idx else (200, 200, 200)
+            cv2.putText(frame, txt, (15, h - 130 + (idx * 22)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 3)
+            cv2.putText(frame, txt, (15, h - 130 + (idx * 22)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, c, 1)
+
+        cv2.putText(
+            frame,
+            "Fill the box with the animal photo",
+            (x1 + 10, y2 - 15),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 255, 255),
+            2,
+        )
+
         cv2.imshow("Edge AI Animal Detection (Press 'q' to Quit)", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
