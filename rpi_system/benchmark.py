@@ -36,13 +36,29 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
     input_shape = input_details[0]["shape"]
     input_dtype = input_details[0]["dtype"]
 
-    # Gather image files per class
+    # Gather image files per class from VAL_DIR or data_dir with Italian folder mapping
+    val_dir = getattr(config, "VAL_DIR", data_dir / "val")
+    search_dir = val_dir if (val_dir.exists() and val_dir.name == "val") else data_dir
+
+    ENGLISH_TO_ITALIAN = {
+        "dog": "cane", "horse": "cavallo", "elephant": "elefante",
+        "butterfly": "farfalla", "chicken": "gallina", "cat": "gatto",
+        "lion": "lion", "cow": "mucca", "sheep": "pecora", "squirrel": "scoiattolo",
+    }
+
     label_to_idx = {name: i for i, name in enumerate(labels)}
     all_files = []
     
     for class_name in labels:
-        class_folder = data_dir / class_name
-        if not class_folder.is_dir():
+        it_name = ENGLISH_TO_ITALIAN.get(class_name.lower(), class_name.lower())
+        candidates = [
+            search_dir / class_name,
+            search_dir / class_name.lower(),
+            search_dir / it_name,
+            search_dir / it_name.capitalize(),
+        ]
+        class_folder = next((p for p in candidates if p.is_dir()), None)
+        if not class_folder:
             continue
         class_files = list(class_folder.glob("*.jpg")) + list(class_folder.glob("*.png")) + list(class_folder.glob("*.jpeg"))
         for f in class_files:
@@ -52,18 +68,21 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
     if total_images == 0:
         return None
 
-    # Deterministic split matching training.ipynb (seed 42)
-    np.random.seed(seed)
-    indices = np.random.permutation(total_images)
-    val_size = int(total_images * val_split)
-    val_indices = indices[:val_size]
-    val_files = [all_files[i] for i in val_indices]
+    # Use 20% holdout split (seed 42) matching training.ipynb if using raw-img
+    if val_dir.exists() and val_dir.name == "val":
+        val_files = all_files
+    else:
+        np.random.seed(seed)
+        indices = np.random.permutation(total_images)
+        val_size = int(total_images * val_split)
+        val_indices = indices[:val_size]
+        val_files = [all_files[i] for i in val_indices]
 
     y_true = []
     y_pred = []
     top3_correct = 0
 
-    print(f"Evaluating model on {len(val_files)} validation images (out of {total_images} total)...")
+    print(f"Evaluating model on {len(val_files)} validation images (out of {total_images} total across {len(labels)} classes)...")
 
     for img_path, true_label_idx in val_files:
         img = cv2.imread(str(img_path))
@@ -254,30 +273,6 @@ def run_benchmark():
     print(f"  • Fastest Run (min)     : {speed_results['min_latency_ms']:.2f} ms")
     print(f"  • Standard Deviation    : ±{speed_results['std_latency_ms']:.2f} ms")
     print(f"  • Throughput            : {speed_results['throughput_fps']:.1f} FPS (frames per second)")
-
-    # 5. Formatted Resume / Portfolio Bullet Points
-    print("================================================================================")
-    print("         PROVEN RESUME & PORTFOLIO BULLET POINTS (COPY-PASTE READY)             ")
-    print("================================================================================")
-    top1 = acc_results['top1_accuracy'] if acc_results else 97.1
-    f1 = acc_results['macro_f1'] if acc_results else 97.0
-    mean_lat = speed_results['mean_latency_ms']
-    fps = speed_results['throughput_fps']
-
-    print(f"\nOption 1 (Full Stack & Edge Hardware Focus):")
-    print(f"• Engineered an end-to-end Edge AI detection system on Raspberry Pi using a custom-trained")
-    print(f"  MobileNetV3-Small TFLite model ({size_mb:.2f}MB), achieving {top1:.1f}% Top-1 validation accuracy")
-    print(f"  and {f1:.1f}% Macro F1-score across 1,394 images in 11 animal classes.")
-
-    print(f"\nOption 2 (Performance & Latency Focus):")
-    print(f"• Optimized edge inference pipeline with center ROI smart cropping and TFLite runtime,")
-    print(f"  delivering {mean_lat:.1f}ms latency ({fps:.0f}+ FPS) with low memory footprint ({size_mb:.2f}MB model),")
-    print(f"  interfaced with ultrasonic sensor interrupts and Arduino LCD serial telemetry.")
-
-    print(f"\nOption 3 (Concise Single-Line Bullet):")
-    print(f"• Deployed a lightweight {size_mb:.2f}MB MobileNetV3 TFLite model on Raspberry Pi, achieving")
-    print(f"  {top1:.1f}% Top-1 accuracy ({f1:.1f}% F1-score) and {mean_lat:.1f}ms inference latency on 11 animal classes.")
-    print("================================================================================\n")
 
 if __name__ == "__main__":
     run_benchmark()
