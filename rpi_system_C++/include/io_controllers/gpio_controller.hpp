@@ -1,10 +1,11 @@
+#pragma once
+
 #include <chrono>
 #include <iostream>
 #include <optional>
 #include <pigpio.h>
 #include <spdlog/spdlog.h>
 #include <wiringPi.h>
-
 
 class GPIOController {
 private:
