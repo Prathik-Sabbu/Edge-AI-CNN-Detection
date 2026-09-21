@@ -61,24 +61,29 @@ class AnimalClassifier:
             self.is_mock_mode = True
             return
 
-        # Attempt to import tflite_runtime first
+        # Attempt to import tflite_runtime or ai_edge_litert first
         interpreter_cls = None
         try:
-            from tflite_runtime.interpreter import Interpreter
+            from ai_edge_litert.interpreter import Interpreter
             interpreter_cls = Interpreter
-            logger.info("Using tflite_runtime.interpreter.")
+            logger.info("Using ai_edge_litert.interpreter.")
         except ImportError:
             try:
-                import tensorflow as tf
-                interpreter_cls = tf.lite.Interpreter
-                logger.info("Using tensorflow.lite.Interpreter.")
+                from tflite_runtime.interpreter import Interpreter
+                interpreter_cls = Interpreter
+                logger.info("Using tflite_runtime.interpreter.")
             except ImportError:
-                logger.warning(
-                    "Neither tflite-runtime nor tensorflow is installed. "
-                    "Inference will run in SIMULATION MODE."
-                )
-                self.is_mock_mode = True
-                return
+                try:
+                    import tensorflow as tf
+                    interpreter_cls = tf.lite.Interpreter
+                    logger.info("Using tensorflow.lite.Interpreter.")
+                except ImportError:
+                    logger.warning(
+                        "Neither tflite-runtime, ai-edge-litert, nor tensorflow is installed. "
+                        "Inference will run in SIMULATION MODE."
+                    )
+                    self.is_mock_mode = True
+                    return
 
         try:
             self.interpreter = interpreter_cls(model_path=self.model_path)

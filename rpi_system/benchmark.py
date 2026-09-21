@@ -200,8 +200,16 @@ def measure_memory_footprint(model_path: str):
     """Measures RAM allocated by interpreter using tracemalloc."""
     tracemalloc.start()
     try:
-        import tensorflow as tf
-        interpreter = tf.lite.Interpreter(model_path=model_path)
+        try:
+            from ai_edge_litert.interpreter import Interpreter
+        except ImportError:
+            try:
+                from tflite_runtime.interpreter import Interpreter
+            except ImportError:
+                import tensorflow as tf
+                Interpreter = tf.lite.Interpreter
+
+        interpreter = Interpreter(model_path=model_path)
         interpreter.allocate_tensors()
         current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
@@ -228,8 +236,16 @@ def run_benchmark():
     with open(labels_path, "r", encoding="utf-8") as f:
         labels = [line.strip() for line in f if line.strip()]
 
-    import tensorflow as tf
-    interpreter = tf.lite.Interpreter(model_path=str(model_path))
+    try:
+        from ai_edge_litert.interpreter import Interpreter
+    except ImportError:
+        try:
+            from tflite_runtime.interpreter import Interpreter
+        except ImportError:
+            import tensorflow as tf
+            Interpreter = tf.lite.Interpreter
+
+    interpreter = Interpreter(model_path=str(model_path))
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
