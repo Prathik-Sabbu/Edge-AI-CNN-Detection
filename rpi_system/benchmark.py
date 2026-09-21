@@ -72,11 +72,44 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
     if val_dir.exists() and val_dir.name == "val":
         val_files = all_files
     else:
-        np.random.seed(seed)
-        indices = np.random.permutation(total_images)
-        val_size = int(total_images * val_split)
-        val_indices = indices[:val_size]
-        val_files = [all_files[i] for i in val_indices]
+        # Prevent Data Leakage: Must match the exact split logic from Keras
+        try:
+            from tensorflow.keras.utils import image_dataset_from_directory
+            val_ds = image_dataset_from_directory(
+                str(search_dir),
+                validation_split=val_split,
+                subset="validation",
+                seed=seed,
+                image_size=(224, 224),
+                batch_size=1,
+                shuffle=False,
+                label_mode=None
+            )
+            keras_files = val_ds.file_paths
+            # Map the exact files returned by Keras back to our true label indexes
+            val_files = []
+            for fpath in keras_files:
+                fname = Path(fpath)
+                parent_dir_name = fname.parent.name
+                
+                # Reverse lookup the class index
+                matched_idx = -1
+                for class_name, idx in label_to_idx.items():
+                    it_name = ENGLISH_TO_ITALIAN.get(class_name.lower(), class_name.lower())
+                    if parent_dir_name.lower() in [class_name.lower(), it_name]:
+                        matched_idx = idx
+                        break
+                
+                if matched_idx != -1:
+                    val_files.append((fname, matched_idx))
+                    
+        except ImportError:
+            # Fallback if TensorFlow is not installed (e.g. on the Pi without val dir)
+            np.random.seed(seed)
+            indices = np.random.permutation(total_images)
+            val_size = int(total_images * val_split)
+            val_indices = indices[:val_size]
+            val_files = [all_files[i] for i in val_indices]
 
     y_true = []
     y_pred = []
@@ -147,9 +180,9 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
         "report": report,
     }
 
-def benchmark_inference_latency(interpreter, num_warmup: int = 20, num_iterations: int = 100):
+def benchmark_inference_latency(interpreter, model_path: str, num_warmup: int = 20, num_iterations: int = 100):
     """
-    Measures raw inference latency (ms) and throughput (FPS).
+    Measures raw inference latency (ms) and end-to-end pipeline latency (ms).
     Tracks p50, p95, p99, mean, and std latency.
     """
     input_details = interpreter.get_input_details()
@@ -163,22 +196,33 @@ def benchmark_inference_latency(interpreter, num_warmup: int = 20, num_iteration
         interpreter.set_tensor(input_details[0]["index"], dummy_input)
         interpreter.invoke()
 
-    # 1. End-to-End Latency including OpenCV preprocessing (Runs First)
+    # 1. End-to-End Latency using the actual AnimalClassifier pipeline (Runs First)
     import cv2
-    dummy_frame = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
-
-    e2e_latencies_ms = []
-    for _ in range(num_iterations):
-        t0 = time.perf_counter()
-        # Preprocess (simulating real camera pipeline)
-        rgb = cv2.cvtColor(dummy_frame, cv2.COLOR_BGR2RGB)
-        resized = cv2.resize(rgb, (input_shape[2], input_shape[1]))
-        input_data = np.expand_dims(resized, axis=0).astype(input_dtype)
-        # Inference
-        interpreter.set_tensor(input_details[0]["index"], input_data)
-        interpreter.invoke()
-        t1 = time.perf_counter()
-        e2e_latencies_ms.append((t1 - t0) * 1000.0)
+    import sys
+    
+    # Try importing the classifier for the true end-to-end test
+    try:
+        from vision.classifier import AnimalClassifier
+        clf = AnimalClassifier(
+            model_path=model_path,
+            labels_path=str(Path(model_path).parent / "labels.txt"),
+            enable_roi_crop=False
+        )
+        dummy_frame = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
+        
+        # Warmup the classifier
+        for _ in range(num_warmup):
+            clf.predict(dummy_frame)
+            
+        e2e_latencies_ms = []
+        for _ in range(num_iterations):
+            t0 = time.perf_counter()
+            clf.predict(dummy_frame)
+            t1 = time.perf_counter()
+            e2e_latencies_ms.append((t1 - t0) * 1000.0)
+    except Exception as e:
+        print(f"Warning: Could not initialize AnimalClassifier for end-to-end test: {e}")
+        e2e_latencies_ms = [0.0] * num_iterations
 
     # 2. Pure Inference Latency (Runs Second)
     inf_latencies_ms = []
@@ -300,10 +344,10 @@ def run_benchmark():
 
     # 4. Latency & Throughput Benchmark
     print(f"\n[4] INFERENCE SPEED & LATENCY (100 Iterations):")
-    speed_results = benchmark_inference_latency(interpreter, num_warmup=20, num_iterations=100)
+    speed_results = benchmark_inference_latency(interpreter, str(model_path), num_warmup=20, num_iterations=100)
     print(f"  • Pure AI Math (Mean)   : {speed_results['inf_mean']:.2f} ms")
     print(f"  • Pure AI Math (p99)    : {speed_results['inf_p99']:.2f} ms")
-    print(f"  • End-to-End (Mean)     : {speed_results['e2e_mean']:.2f} ms (includes OpenCV)")
+    print(f"  • End-to-End (Mean)     : {speed_results['e2e_mean']:.2f} ms (using AnimalClassifier.predict)")
     print(f"  • End-to-End (p99)      : {speed_results['e2e_p99']:.2f} ms")
     print(f"  • True Throughput       : {speed_results['e2e_fps']:.1f} FPS (frames per second)")
 
