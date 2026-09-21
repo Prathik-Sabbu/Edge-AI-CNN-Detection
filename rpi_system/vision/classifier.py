@@ -20,12 +20,14 @@ class AnimalClassifier:
         confidence_threshold: float = 0.50,
         enable_roi_crop: bool = True,
         roi_crop_scale: float = 1.0,
+        num_threads: int = 1,
     ):
         self.model_path = model_path
         self.labels_path = labels_path
         self.confidence_threshold = confidence_threshold
         self.enable_roi_crop = enable_roi_crop
         self.roi_crop_scale = roi_crop_scale
+        self.num_threads = num_threads
 
         self.interpreter = None
         self.input_details = None
@@ -86,7 +88,7 @@ class AnimalClassifier:
                     return
 
         try:
-            self.interpreter = interpreter_cls(model_path=self.model_path, num_threads=1)
+            self.interpreter = interpreter_cls(model_path=self.model_path, num_threads=self.num_threads)
             self.interpreter.allocate_tensors()
             self.input_details = self.interpreter.get_input_details()
             self.output_details = self.interpreter.get_output_details()

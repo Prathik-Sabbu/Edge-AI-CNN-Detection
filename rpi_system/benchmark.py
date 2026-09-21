@@ -26,11 +26,12 @@ def get_model_size_info(model_path: Path):
     size_mb = size_kb / 1024
     return size_bytes, size_kb, size_mb
 
-def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: float = 0.2, seed: int = 42):
+def evaluate_accuracy_and_f1(clf, labels, data_dir: Path, val_split: float = 0.2, seed: int = 42):
     """
     Evaluates Top-1 accuracy, Top-3 accuracy, precision, recall, and F1-score
     across the validation split (80/20 train/val split matching training.ipynb).
     """
+    interpreter = clf.interpreter
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
     input_shape = input_details[0]["shape"]
@@ -82,8 +83,8 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
                 seed=seed,
                 image_size=(224, 224),
                 batch_size=1,
-                shuffle=False,
                 label_mode=None
+                # Removed shuffle=False to match training.ipynb default (True)
             )
             keras_files = val_ds.file_paths
             # Map the exact files returned by Keras back to our true label indexes
@@ -122,16 +123,8 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
         if img is None:
             continue
 
-        # Preprocess matching training pipeline
-        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        resized = cv2.resize(rgb, (config.INPUT_WIDTH, config.INPUT_HEIGHT))
-        input_data = np.expand_dims(resized, axis=0).astype(np.float32)
-
-        # MobileNetV3 (with include_preprocessing=True) expects raw [0, 255] pixels.
-        # No division or -1 to 1 scaling is needed.
-
-        if input_dtype == np.uint8:
-            input_data = input_data.astype(np.uint8)
+        # Preprocess matching the EXACT deployed pipeline
+        input_data = clf.preprocess_image(img)
 
         interpreter.set_tensor(input_details[0]["index"], input_data)
         interpreter.invoke()
@@ -160,12 +153,13 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
         macro_precision = precision_score(y_true, y_pred, average="macro", zero_division=0) * 100.0
         macro_recall = recall_score(y_true, y_pred, average="macro", zero_division=0) * 100.0
         report = classification_report(y_true, y_pred, target_names=[labels[i] for i in sorted(set(y_true))], zero_division=0)
-    except Exception:
-        macro_f1 = top1_acc
-        weighted_f1 = top1_acc
-        macro_precision = top1_acc
-        macro_recall = top1_acc
-        report = "sklearn not available for detailed breakdown."
+    except ImportError:
+        print("\n[WARNING] scikit-learn is not installed. F1, Precision, and Recall metrics are hidden.")
+        macro_f1 = None
+        weighted_f1 = None
+        macro_precision = None
+        macro_recall = None
+        report = "sklearn not available. Install it using `pip install scikit-learn` to see detailed metrics."
 
     return {
         "total_dataset_size": total_images,
@@ -180,19 +174,22 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
         "report": report,
     }
 
-def benchmark_inference_latency(interpreter, model_path: str, num_warmup: int = 20, num_iterations: int = 100):
+def benchmark_inference_latency(clf, num_iterations: int = 300, warmup_seconds: float = 3.0):
     """
     Measures raw inference latency (ms) and end-to-end pipeline latency (ms).
     Tracks p50, p95, p99, mean, and std latency.
     """
+    interpreter = clf.interpreter
     input_details = interpreter.get_input_details()
     input_shape = input_details[0]["shape"]
     input_dtype = input_details[0]["dtype"]
 
     dummy_input = np.random.uniform(-1.0, 1.0, size=input_shape).astype(input_dtype)
 
-    # Warmup runs (prime memory, caches, threads)
-    for _ in range(num_warmup):
+    # Time-based Warmup (prime memory, caches, threads, CPU governor)
+    print(f"  -> Warming up CPU for {warmup_seconds} seconds...")
+    end_time = time.perf_counter() + warmup_seconds
+    while time.perf_counter() < end_time:
         interpreter.set_tensor(input_details[0]["index"], dummy_input)
         interpreter.invoke()
 
@@ -207,31 +204,14 @@ def benchmark_inference_latency(interpreter, model_path: str, num_warmup: int = 
 
     # 2. End-to-End Latency using the actual AnimalClassifier pipeline (Runs Second)
     import cv2
-    import sys
+    dummy_frame = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
     
-    # Try importing the classifier for the true end-to-end test
-    try:
-        from vision.classifier import AnimalClassifier
-        clf = AnimalClassifier(
-            model_path=model_path,
-            labels_path=str(Path(model_path).parent / "labels.txt"),
-            enable_roi_crop=False
-        )
-        dummy_frame = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
-        
-        # Warmup the classifier
-        for _ in range(num_warmup):
-            clf.predict(dummy_frame)
-            
-        e2e_latencies_ms = []
-        for _ in range(num_iterations):
-            t0 = time.perf_counter()
-            clf.predict(dummy_frame)
-            t1 = time.perf_counter()
-            e2e_latencies_ms.append((t1 - t0) * 1000.0)
-    except Exception as e:
-        print(f"Warning: Could not initialize AnimalClassifier for end-to-end test: {e}")
-        e2e_latencies_ms = [0.0] * num_iterations
+    e2e_latencies_ms = []
+    for _ in range(num_iterations):
+        t0 = time.perf_counter()
+        clf.predict(dummy_frame)
+        t1 = time.perf_counter()
+        e2e_latencies_ms.append((t1 - t0) * 1000.0)
 
     inf_latencies = np.array(inf_latencies_ms)
     e2e_latencies = np.array(e2e_latencies_ms)
@@ -245,41 +225,7 @@ def benchmark_inference_latency(interpreter, model_path: str, num_warmup: int = 
         "e2e_fps": 1000.0 / np.mean(e2e_latencies),
     }
 
-def measure_memory_footprint(model_path: str):
-    """Measures RAM allocated by interpreter using OS metrics."""
-    import os
-    try:
-        import psutil
-        process = psutil.Process(os.getpid())
-        mem_before = process.memory_info().rss
-    except ImportError:
-        mem_before = 0
-
-    try:
-        try:
-            from ai_edge_litert.interpreter import Interpreter
-        except ImportError:
-            try:
-                from tflite_runtime.interpreter import Interpreter
-            except ImportError:
-                import tensorflow as tf
-                Interpreter = tf.lite.Interpreter
-
-        interpreter = Interpreter(model_path=model_path, num_threads=1)
-        interpreter.allocate_tensors()
-        
-        try:
-            mem_after = process.memory_info().rss
-            return mem_after / (1024 * 1024), mem_after / (1024 * 1024)
-        except NameError:
-            # Fallback if psutil not installed on Pi
-            with open("/proc/self/statm") as f:
-                pages = int(f.read().split()[1])
-                page_size = os.sysconf("SC_PAGE_SIZE")
-                mem_mb = (pages * page_size) / (1024 * 1024)
-                return mem_mb, mem_mb
-    except Exception:
-        return 0.0, 0.0
+    pass # Removed since we measure peak memory at the end of the script
 
 def run_benchmark():
     model_path = Path(config.OUTPUT_TFLITE)
@@ -299,57 +245,80 @@ def run_benchmark():
     with open(labels_path, "r", encoding="utf-8") as f:
         labels = [line.strip() for line in f if line.strip()]
 
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from vision.classifier import AnimalClassifier
+
+    print("\n[1] MODEL ARCHITECTURE PROFILE:")
+    # Initialize the real deployed pipeline for accurate testing (with exactly 1 thread to match our ideal state)
     try:
-        from ai_edge_litert.interpreter import Interpreter
-    except ImportError:
-        try:
-            from tflite_runtime.interpreter import Interpreter
-        except ImportError:
-            import tensorflow as tf
-            Interpreter = tf.lite.Interpreter
+        clf = AnimalClassifier(
+            model_path=str(model_path),
+            labels_path=str(labels_path),
+            enable_roi_crop=False,
+            num_threads=1
+        )
+    except Exception as e:
+        print(f"Error loading classifier: {e}")
+        return
 
-    interpreter = Interpreter(model_path=str(model_path), num_threads=4)
-    interpreter.allocate_tensors()
+    interpreter = clf.interpreter
     input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
-
     input_shape = input_details[0]["shape"]
     input_dtype = str(input_details[0]["dtype"].__name__)
 
-    print(f"\n[1] MODEL ARCHITECTURE PROFILE:")
     print(f"  • Base Architecture    : MobileNetV3-Small (Transfer Learning from ImageNet)")
     print(f"  • Model Format          : TensorFlow Lite (.tflite)")
     print(f"  • Input Tensor Shape    : {input_shape.tolist()} ({input_dtype})")
     print(f"  • Number of Classes     : {len(labels)} classes: {labels}")
     print(f"  • File Size on Disk     : {size_mb:.2f} MB ({size_kb:.1f} KB / {size_bytes:,} bytes)")
 
-    # 2. Memory Footprint
-    curr_mb, peak_mb = measure_memory_footprint(str(model_path))
-    print(f"\n[2] MEMORY / RAM FOOTPRINT:")
-    print(f"  • Peak Allocation Trace : {peak_mb:.2f} MB")
-
-    # 3. Accuracy & F1-Score
-    print(f"\n[3] CLASSIFICATION ACCURACY & F1 METRICS:")
-    acc_results = evaluate_accuracy_and_f1(interpreter, labels, data_dir)
+    # 2. Accuracy & F1-Score
+    print(f"\n[2] CLASSIFICATION ACCURACY & F1 METRICS:")
+    acc_results = evaluate_accuracy_and_f1(clf, labels, data_dir)
     if acc_results:
         print(f"  • Dataset Evaluated     : {acc_results['total_dataset_size']} total images across {acc_results['num_classes']} classes")
         print(f"  • Validation Split      : {acc_results['val_set_size']} validation images (20% holdout split)")
         print(f"  • Top-1 Accuracy        : {acc_results['top1_accuracy']:.2f}%")
         print(f"  • Top-3 Accuracy        : {acc_results['top3_accuracy']:.2f}%")
-        print(f"  • Macro F1-Score        : {acc_results['macro_f1']:.2f}%")
-        print(f"  • Weighted F1-Score     : {acc_results['weighted_f1']:.2f}%")
-        print(f"  • Macro Precision       : {acc_results['macro_precision']:.2f}%")
-        print(f"  • Macro Recall          : {acc_results['macro_recall']:.2f}%")
-        print(f"\n  Classification Report Breakdown:\n{acc_results['report']}")
+        
+        if acc_results['macro_f1'] is not None:
+            print(f"  • Macro F1-Score        : {acc_results['macro_f1']:.2f}%")
+            print(f"  • Weighted F1-Score     : {acc_results['weighted_f1']:.2f}%")
+            print(f"  • Macro Precision       : {acc_results['macro_precision']:.2f}%")
+            print(f"  • Macro Recall          : {acc_results['macro_recall']:.2f}%")
+            print(f"\n  Classification Report Breakdown:\n{acc_results['report']}")
+        else:
+            print(f"  • F1 Metrics            : {acc_results['report']}")
 
-    # 4. Latency & Throughput Benchmark
-    print(f"\n[4] INFERENCE SPEED & LATENCY (100 Iterations):")
-    speed_results = benchmark_inference_latency(interpreter, str(model_path), num_warmup=20, num_iterations=100)
+    # 3. Latency & Throughput Benchmark
+    print(f"\n[3] INFERENCE SPEED & LATENCY (300 Iterations):")
+    speed_results = benchmark_inference_latency(clf, num_iterations=300, warmup_seconds=3.0)
     print(f"  • Pure AI Math (Mean)   : {speed_results['inf_mean']:.2f} ms")
     print(f"  • Pure AI Math (p99)    : {speed_results['inf_p99']:.2f} ms")
     print(f"  • End-to-End (Mean)     : {speed_results['e2e_mean']:.2f} ms (using AnimalClassifier.predict)")
     print(f"  • End-to-End (p99)      : {speed_results['e2e_p99']:.2f} ms")
     print(f"  • True Throughput       : {speed_results['e2e_fps']:.1f} FPS (frames per second)")
+
+    # 4. Memory Footprint
+    print(f"\n[4] MEMORY / RAM FOOTPRINT:")
+    try:
+        import resource
+        peak_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # Mac gives bytes, Linux gives KB. Assume KB for Linux/Pi
+        if sys.platform == "darwin":
+            peak_mb = peak_kb / (1024 * 1024)
+        else:
+            peak_mb = peak_kb / 1024
+        print(f"  • Peak Process RSS      : {peak_mb:.2f} MB")
+    except ImportError:
+        try:
+            import psutil
+            import os
+            peak_bytes = psutil.Process(os.getpid()).memory_info().peak_wset
+            print(f"  • Peak Process RSS      : {peak_bytes / (1024 * 1024):.2f} MB (Windows)")
+        except ImportError:
+            print(f"  • Peak Process RSS      : Not available (requires 'resource' or 'psutil')")
 
 if __name__ == "__main__":
     run_benchmark()
