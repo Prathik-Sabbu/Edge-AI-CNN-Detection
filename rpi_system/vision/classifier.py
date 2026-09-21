@@ -20,7 +20,7 @@ class AnimalClassifier:
         confidence_threshold: float = 0.50,
         enable_roi_crop: bool = True,
         roi_crop_scale: float = 1.0,
-        num_threads: int = 4,
+        num_threads: int = 1,
     ):
         self.model_path = model_path
         self.labels_path = labels_path

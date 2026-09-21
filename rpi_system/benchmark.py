@@ -256,7 +256,7 @@ def run_benchmark():
             model_path=str(model_path),
             labels_path=str(labels_path),
             enable_roi_crop=False,
-            num_threads=4
+            num_threads=1
         )
     except Exception as e:
         print(f"Error loading classifier: {e}")
