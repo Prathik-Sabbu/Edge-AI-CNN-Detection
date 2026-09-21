@@ -163,7 +163,24 @@ def benchmark_inference_latency(interpreter, num_warmup: int = 20, num_iteration
         interpreter.set_tensor(input_details[0]["index"], dummy_input)
         interpreter.invoke()
 
-    # 1. Pure Inference Latency
+    # 1. End-to-End Latency including OpenCV preprocessing (Runs First)
+    import cv2
+    dummy_frame = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
+
+    e2e_latencies_ms = []
+    for _ in range(num_iterations):
+        t0 = time.perf_counter()
+        # Preprocess (simulating real camera pipeline)
+        rgb = cv2.cvtColor(dummy_frame, cv2.COLOR_BGR2RGB)
+        resized = cv2.resize(rgb, (input_shape[2], input_shape[1]))
+        input_data = np.expand_dims(resized, axis=0).astype(input_dtype)
+        # Inference
+        interpreter.set_tensor(input_details[0]["index"], input_data)
+        interpreter.invoke()
+        t1 = time.perf_counter()
+        e2e_latencies_ms.append((t1 - t0) * 1000.0)
+
+    # 2. Pure Inference Latency (Runs Second)
     inf_latencies_ms = []
     for _ in range(num_iterations):
         t0 = time.perf_counter()
@@ -171,23 +188,6 @@ def benchmark_inference_latency(interpreter, num_warmup: int = 20, num_iteration
         interpreter.invoke()
         t1 = time.perf_counter()
         inf_latencies_ms.append((t1 - t0) * 1000.0)
-
-    # 2. End-to-End Latency including OpenCV preprocessing
-    import cv2
-    dummy_frame = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
-
-    e2e_latencies_ms = []
-    for _ in range(num_iterations):
-        t0 = time.perf_counter()
-        # 1. Preprocess (simulating real camera pipeline)
-        rgb = cv2.cvtColor(dummy_frame, cv2.COLOR_BGR2RGB)
-        resized = cv2.resize(rgb, (input_shape[2], input_shape[1]))
-        input_data = np.expand_dims(resized, axis=0).astype(input_dtype)
-        # 2. Inference
-        interpreter.set_tensor(input_details[0]["index"], input_data)
-        interpreter.invoke()
-        t1 = time.perf_counter()
-        e2e_latencies_ms.append((t1 - t0) * 1000.0)
 
     inf_latencies = np.array(inf_latencies_ms)
     e2e_latencies = np.array(e2e_latencies_ms)
