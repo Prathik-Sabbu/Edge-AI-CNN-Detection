@@ -265,7 +265,7 @@ def measure_memory_footprint(model_path: str):
                 import tensorflow as tf
                 Interpreter = tf.lite.Interpreter
 
-        interpreter = Interpreter(model_path=model_path, num_threads=4)
+        interpreter = Interpreter(model_path=model_path, num_threads=1)
         interpreter.allocate_tensors()
         
         try:
