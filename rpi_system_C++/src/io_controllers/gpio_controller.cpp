@@ -3,7 +3,6 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
-
 #ifdef __arm__
 #include <pigpio.h>
 #endif

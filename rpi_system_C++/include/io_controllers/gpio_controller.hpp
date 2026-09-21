@@ -21,10 +21,10 @@ private:
 
   void setup_gpio();
   std::optional<float> measure_distance_cm();
-  bool check_for_trigger();
   void cleanup();
 
 public:
   GPIOController();
   ~GPIOController();
+  bool check_for_trigger();
 };
