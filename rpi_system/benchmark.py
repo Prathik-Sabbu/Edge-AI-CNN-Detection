@@ -196,7 +196,16 @@ def benchmark_inference_latency(interpreter, model_path: str, num_warmup: int = 
         interpreter.set_tensor(input_details[0]["index"], dummy_input)
         interpreter.invoke()
 
-    # 1. End-to-End Latency using the actual AnimalClassifier pipeline (Runs First)
+    # 1. Pure Inference Latency (Runs First)
+    inf_latencies_ms = []
+    for _ in range(num_iterations):
+        t0 = time.perf_counter()
+        interpreter.set_tensor(input_details[0]["index"], dummy_input)
+        interpreter.invoke()
+        t1 = time.perf_counter()
+        inf_latencies_ms.append((t1 - t0) * 1000.0)
+
+    # 2. End-to-End Latency using the actual AnimalClassifier pipeline (Runs Second)
     import cv2
     import sys
     
@@ -223,15 +232,6 @@ def benchmark_inference_latency(interpreter, model_path: str, num_warmup: int = 
     except Exception as e:
         print(f"Warning: Could not initialize AnimalClassifier for end-to-end test: {e}")
         e2e_latencies_ms = [0.0] * num_iterations
-
-    # 2. Pure Inference Latency (Runs Second)
-    inf_latencies_ms = []
-    for _ in range(num_iterations):
-        t0 = time.perf_counter()
-        interpreter.set_tensor(input_details[0]["index"], dummy_input)
-        interpreter.invoke()
-        t1 = time.perf_counter()
-        inf_latencies_ms.append((t1 - t0) * 1000.0)
 
     inf_latencies = np.array(inf_latencies_ms)
     e2e_latencies = np.array(e2e_latencies_ms)
