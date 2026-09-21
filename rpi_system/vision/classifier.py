@@ -86,7 +86,7 @@ class AnimalClassifier:
                     return
 
         try:
-            self.interpreter = interpreter_cls(model_path=self.model_path, num_threads=2)
+            self.interpreter = interpreter_cls(model_path=self.model_path, num_threads=1)
             self.interpreter.allocate_tensors()
             self.input_details = self.interpreter.get_input_details()
             self.output_details = self.interpreter.get_output_details()
