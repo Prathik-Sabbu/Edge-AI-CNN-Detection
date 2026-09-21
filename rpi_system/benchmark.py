@@ -163,11 +163,20 @@ def benchmark_inference_latency(interpreter, num_warmup: int = 20, num_iteration
         interpreter.set_tensor(input_details[0]["index"], dummy_input)
         interpreter.invoke()
 
-    # Measure End-to-End Latency including OpenCV preprocessing
+    # 1. Pure Inference Latency
+    inf_latencies_ms = []
+    for _ in range(num_iterations):
+        t0 = time.perf_counter()
+        interpreter.set_tensor(input_details[0]["index"], dummy_input)
+        interpreter.invoke()
+        t1 = time.perf_counter()
+        inf_latencies_ms.append((t1 - t0) * 1000.0)
+
+    # 2. End-to-End Latency including OpenCV preprocessing
     import cv2
     dummy_frame = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
 
-    latencies_ms = []
+    e2e_latencies_ms = []
     for _ in range(num_iterations):
         t0 = time.perf_counter()
         # 1. Preprocess (simulating real camera pipeline)
@@ -178,26 +187,18 @@ def benchmark_inference_latency(interpreter, num_warmup: int = 20, num_iteration
         interpreter.set_tensor(input_details[0]["index"], input_data)
         interpreter.invoke()
         t1 = time.perf_counter()
-        latencies_ms.append((t1 - t0) * 1000.0)
+        e2e_latencies_ms.append((t1 - t0) * 1000.0)
 
-    latencies_ms = np.array(latencies_ms)
-    mean_lat = np.mean(latencies_ms)
-    median_lat = np.median(latencies_ms)
-    p95_lat = np.percentile(latencies_ms, 95)
-    p99_lat = np.percentile(latencies_ms, 99)
-    min_lat = np.min(latencies_ms)
-    std_lat = np.std(latencies_ms)
-    fps = 1000.0 / mean_lat
+    inf_latencies = np.array(inf_latencies_ms)
+    e2e_latencies = np.array(e2e_latencies_ms)
 
     return {
         "num_iterations": num_iterations,
-        "mean_latency_ms": mean_lat,
-        "median_latency_ms": median_lat,
-        "p95_latency_ms": p95_lat,
-        "p99_latency_ms": p99_lat,
-        "min_latency_ms": min_lat,
-        "std_latency_ms": std_lat,
-        "throughput_fps": fps,
+        "inf_mean": np.mean(inf_latencies),
+        "inf_p99": np.percentile(inf_latencies, 99),
+        "e2e_mean": np.mean(e2e_latencies),
+        "e2e_p99": np.percentile(e2e_latencies, 99),
+        "e2e_fps": 1000.0 / np.mean(e2e_latencies),
     }
 
 def measure_memory_footprint(model_path: str):
@@ -300,13 +301,11 @@ def run_benchmark():
     # 4. Latency & Throughput Benchmark
     print(f"\n[4] INFERENCE SPEED & LATENCY (100 Iterations):")
     speed_results = benchmark_inference_latency(interpreter, num_warmup=20, num_iterations=100)
-    print(f"  • Mean Latency          : {speed_results['mean_latency_ms']:.2f} ms")
-    print(f"  • Median (p50) Latency  : {speed_results['median_latency_ms']:.2f} ms")
-    print(f"  • 95th Percentile (p95) : {speed_results['p95_latency_ms']:.2f} ms")
-    print(f"  • 99th Percentile (p99) : {speed_results['p99_latency_ms']:.2f} ms")
-    print(f"  • Fastest Run (min)     : {speed_results['min_latency_ms']:.2f} ms")
-    print(f"  • Standard Deviation    : ±{speed_results['std_latency_ms']:.2f} ms")
-    print(f"  • Throughput            : {speed_results['throughput_fps']:.1f} FPS (frames per second)")
+    print(f"  • Pure AI Math (Mean)   : {speed_results['inf_mean']:.2f} ms")
+    print(f"  • Pure AI Math (p99)    : {speed_results['inf_p99']:.2f} ms")
+    print(f"  • End-to-End (Mean)     : {speed_results['e2e_mean']:.2f} ms (includes OpenCV)")
+    print(f"  • End-to-End (p99)      : {speed_results['e2e_p99']:.2f} ms")
+    print(f"  • True Throughput       : {speed_results['e2e_fps']:.1f} FPS (frames per second)")
 
 if __name__ == "__main__":
     run_benchmark()
