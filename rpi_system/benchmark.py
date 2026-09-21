@@ -94,13 +94,8 @@ def evaluate_accuracy_and_f1(interpreter, labels, data_dir: Path, val_split: flo
         resized = cv2.resize(rgb, (config.INPUT_WIDTH, config.INPUT_HEIGHT))
         input_data = np.expand_dims(resized, axis=0).astype(np.float32)
 
-        # Apply MobileNetV3 preprocessing (scales to [-1, 1])
-        try:
-            from tensorflow.keras.applications.mobilenet_v3 import preprocess_input
-            input_data = preprocess_input(input_data)
-        except Exception:
-            # Fallback if standalone: (x / 127.5) - 1.0
-            input_data = (input_data / 127.5) - 1.0
+        # MobileNetV3 (with include_preprocessing=True) expects raw [0, 255] pixels.
+        # No division or -1 to 1 scaling is needed.
 
         if input_dtype == np.uint8:
             input_data = input_data.astype(np.uint8)
@@ -168,10 +163,19 @@ def benchmark_inference_latency(interpreter, num_warmup: int = 20, num_iteration
         interpreter.set_tensor(input_details[0]["index"], dummy_input)
         interpreter.invoke()
 
+    # Measure End-to-End Latency including OpenCV preprocessing
+    import cv2
+    dummy_frame = np.random.randint(0, 255, size=(480, 640, 3), dtype=np.uint8)
+
     latencies_ms = []
     for _ in range(num_iterations):
         t0 = time.perf_counter()
-        interpreter.set_tensor(input_details[0]["index"], dummy_input)
+        # 1. Preprocess (simulating real camera pipeline)
+        rgb = cv2.cvtColor(dummy_frame, cv2.COLOR_BGR2RGB)
+        resized = cv2.resize(rgb, (input_shape[2], input_shape[1]))
+        input_data = np.expand_dims(resized, axis=0).astype(input_dtype)
+        # 2. Inference
+        interpreter.set_tensor(input_details[0]["index"], input_data)
         interpreter.invoke()
         t1 = time.perf_counter()
         latencies_ms.append((t1 - t0) * 1000.0)
@@ -197,8 +201,15 @@ def benchmark_inference_latency(interpreter, num_warmup: int = 20, num_iteration
     }
 
 def measure_memory_footprint(model_path: str):
-    """Measures RAM allocated by interpreter using tracemalloc."""
-    tracemalloc.start()
+    """Measures RAM allocated by interpreter using OS metrics."""
+    import os
+    try:
+        import psutil
+        process = psutil.Process(os.getpid())
+        mem_before = process.memory_info().rss
+    except ImportError:
+        mem_before = 0
+
     try:
         try:
             from ai_edge_litert.interpreter import Interpreter
@@ -209,13 +220,20 @@ def measure_memory_footprint(model_path: str):
                 import tensorflow as tf
                 Interpreter = tf.lite.Interpreter
 
-        interpreter = Interpreter(model_path=model_path)
+        interpreter = Interpreter(model_path=model_path, num_threads=4)
         interpreter.allocate_tensors()
-        current, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        return current / (1024 * 1024), peak / (1024 * 1024)
+        
+        try:
+            mem_after = process.memory_info().rss
+            return mem_after / (1024 * 1024), mem_after / (1024 * 1024)
+        except NameError:
+            # Fallback if psutil not installed on Pi
+            with open("/proc/self/statm") as f:
+                pages = int(f.read().split()[1])
+                page_size = os.sysconf("SC_PAGE_SIZE")
+                mem_mb = (pages * page_size) / (1024 * 1024)
+                return mem_mb, mem_mb
     except Exception:
-        tracemalloc.stop()
         return 0.0, 0.0
 
 def run_benchmark():
@@ -245,7 +263,7 @@ def run_benchmark():
             import tensorflow as tf
             Interpreter = tf.lite.Interpreter
 
-    interpreter = Interpreter(model_path=str(model_path))
+    interpreter = Interpreter(model_path=str(model_path), num_threads=4)
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
