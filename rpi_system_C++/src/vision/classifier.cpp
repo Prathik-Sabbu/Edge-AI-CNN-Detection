@@ -1,4 +1,5 @@
-#include "rpi_system_C++/include/vision/classifier.hpp"
+#include "../../include/vision/classifier.hpp"
+#include "../../include/config.hpp"
 #include <filesystem>
 #include <fstream>
 #include <opencv2/opencv.hpp>
@@ -12,13 +13,10 @@
 #include <tuple>
 #include <vector>
 
-AnimalClassifier::AnimalClassifier(const std::string &model_path,
-                                   const std::string &labels_path,
-                                   float confidence_threshold,
-                                   bool enable_roi_crop, float roi_crop_scale)
-    : model_path(model_path), labels_path(labels_path),
-      confidence_threshold(confidence_threshold),
-      enable_roi_crop(enable_roi_crop), roi_crop_scale(roi_crop_scale) {
+AnimalClassifier::AnimalClassifier()
+    : model_path(Config::MODEL_PATH), labels_path(Config::LABELS_PATH),
+      confidence_threshold(Config::CONFIDENCE_THRESHOLD),
+      enable_roi_crop(Config::ENABLE_ROI_CROP), roi_crop_scale(Config::ROI_CROP_SCALE) {
   load_labels();
   load_model();
 }
@@ -107,7 +105,7 @@ std::pair<cv::Mat, cv::Rect> AnimalClassifier::crop_roi(const cv::Mat &frame,
 cv::Mat AnimalClassifier::preprocess_image(const cv::Mat &frame) {
   cv::Mat cropped_frame;
   if (enable_roi_crop) {
-    cropped_frame = crop_roi(frame, self.roi_crop_scale).first;
+    cropped_frame = crop_roi(frame, roi_crop_scale).first;
   } else {
     cropped_frame = frame;
   }

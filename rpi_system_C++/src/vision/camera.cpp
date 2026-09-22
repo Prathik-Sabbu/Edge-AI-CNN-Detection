@@ -1,4 +1,5 @@
-#include "rpi_system_C++/include/vision/camera.hpp"
+#include "../../include/vision/camera.hpp"
+#include "../../include/config.hpp"
 #include <chrono>
 #include <opencv2/opencv.hpp>
 #include <optional>
@@ -7,7 +8,14 @@
 #include <tuple>
 
 
-CameraManager::CameraManager() { start(); }
+CameraManager::CameraManager()
+  : camera_index(Config::CAMERA_INDEX),
+    use_picamera(Config::USE_PICAMERA),
+    width(Config::FRAME_WIDTH),
+    height(Config::FRAME_HEIGHT),
+    warmup_frames(Config::WARMUP_FRAMES),
+    allow_mock(true),
+    is_initialized(false) { start(); }
 CameraManager::~CameraManager() { release(); }
 
 bool CameraManager::start() {

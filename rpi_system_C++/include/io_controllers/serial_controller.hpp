@@ -4,9 +4,7 @@
 
 class ArduinoSerialController {
 public:
-  ArduinoSerialController(const std::string &port = "/dev/ttyACM0",
-                          const std::string &fallback_port = "/dev/ttyUSB0",
-                          int baud_rate = 9600, float timeout_sec = 1.0f);
+  ArduinoSerialController();
   ~ArduinoSerialController();
 
   ArduinoSerialController(const ArduinoSerialController &) = delete;
