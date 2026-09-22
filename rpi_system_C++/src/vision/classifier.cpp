@@ -14,7 +14,7 @@
 #include <vector>
 
 #ifdef USE_XNNPACK
-#include <tensorflow/lite/delegates/xnnpack/xnnpack_delegate.h>
+#include <tensorflow/lite/tflite_with_xnnpack_optional.h>
 #endif
 
 AnimalClassifier::AnimalClassifier()
@@ -78,13 +78,11 @@ void AnimalClassifier::load_model() {
     interpreter->SetNumThreads(4); // Utilize all 4 cores on Raspberry Pi
 
 #ifdef USE_XNNPACK
-    TfLiteXNNPackDelegateOptions xnnpack_options = TfLiteXNNPackDelegateOptionsDefault();
-    xnnpack_options.num_threads = 4;
-    TfLiteDelegate* xnnpack_delegate = TfLiteXNNPackDelegateCreate(&xnnpack_options);
-    if (interpreter->ModifyGraphWithDelegate(xnnpack_delegate) != kTfLiteOk) {
-      spdlog::warn("Failed to apply XNNPACK delegate.");
+    // Debian provides an optional wrapper instead of the raw delegate header
+    if (tflite::MaybeApplyXNNPACKDelegate(interpreter.get())) {
+      spdlog::info("Successfully applied XNNPACK delegate using Debian wrapper.");
     } else {
-      spdlog::info("Successfully applied XNNPACK delegate.");
+      spdlog::warn("XNNPACK wrapper failed. Delegate not applied.");
     }
 #endif
   }
