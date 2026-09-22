@@ -47,6 +47,8 @@ void benchmark_inference_latency(AnimalClassifier &clf,
 
   cv::Mat dummy_frame = cv::Mat::zeros(480, 640, CV_8UC3);
 
+  spdlog::set_level(spdlog::level::warn); // Disable stdout printing during benchmark loops
+
   std::cout << "  -> Warming up CPU for " << warmup_seconds << " seconds...\n";
   auto warmup_start = std::chrono::steady_clock::now();
   while (std::chrono::duration<double>(std::chrono::steady_clock::now() -
@@ -65,6 +67,8 @@ void benchmark_inference_latency(AnimalClassifier &clf,
     e2e_latencies_ms.push_back(
         std::chrono::duration<double, std::milli>(t1 - t0).count());
   }
+
+  spdlog::set_level(spdlog::level::info); // Re-enable stdout printing
 
   std::sort(e2e_latencies_ms.begin(), e2e_latencies_ms.end());
   double mean_ms =
