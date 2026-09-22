@@ -1,0 +1,10 @@
+Dog
+Horse
+Elephant
+Butterfly
+Chicken
+Cat
+Lion
+Cow
+Sheep
+Squirrel
