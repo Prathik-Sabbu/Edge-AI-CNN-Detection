@@ -8,13 +8,13 @@
 
 class CameraManager {
 private:
-  int camera_index = 0;
-  bool use_picamera = false;
-  int width = 640;
-  int height = 480;
-  int warmup_frames = 5;
-  bool allow_mock = true;
-  bool is_initialized = false;
+  int camera_index;
+  bool use_picamera;
+  int width;
+  int height;
+  int warmup_frames;
+  bool allow_mock;
+  bool is_initialized;
   cv::VideoCapture cap;
 
   bool start();

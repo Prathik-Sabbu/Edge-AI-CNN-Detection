@@ -1,4 +1,5 @@
 #include "../../include/io_controllers/serial_controller.hpp"
+#include "../../include/config.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -57,12 +58,9 @@ static std::vector<std::string> list_serial_ports() {
 }
 #endif
 
-ArduinoSerialController::ArduinoSerialController(const std::string &port,
-                                                 const std::string &fallback,
-                                                 int baud_rate,
-                                                 float timeout_sec)
-    : preferred_port_(port), fallback_port_(fallback), baud_rate_(baud_rate),
-      timeout_sec_(timeout_sec) {}
+ArduinoSerialController::ArduinoSerialController()
+    : preferred_port_(Config::SERIAL_PORT), fallback_port_(Config::SERIAL_PORT_FALLBACK),
+      baud_rate_(Config::BAUD_RATE), timeout_sec_(Config::SERIAL_TIMEOUT) {}
 
 ArduinoSerialController::~ArduinoSerialController() { disconnect(); }
 

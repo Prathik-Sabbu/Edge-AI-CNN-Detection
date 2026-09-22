@@ -17,9 +17,9 @@ class AnimalClassifier {
 private:
   std::string model_path;
   std::string labels_path;
-  float confidence_threshold = 0.50;
-  bool enable_roi_crop = true;
-  float roi_crop_scale = 1.0;
+  float confidence_threshold;
+  bool enable_roi_crop;
+  float roi_crop_scale;
   std::unique_ptr<tflite::Interpreter> interpreter;
   std::vector<std::string> labels;
   bool is_mock_mode = false;
@@ -30,10 +30,7 @@ private:
   cv::Mat preprocess_image(const cv::Mat &frame);
 
 public:
-  AnimalClassifier(const std::string &model_path,
-                   const std::string &labels_path,
-                   float confidence_threshold = 0.5f,
-                   bool enable_roi_crop = true, float roi_crop_scale = 1.0f);
+  AnimalClassifier();
   ~AnimalClassifier();
   std::tuple<std::string, double> predict(const cv::Mat &frame);
   static std::pair<cv::Mat, cv::Rect> crop_roi(const cv::Mat &frame,

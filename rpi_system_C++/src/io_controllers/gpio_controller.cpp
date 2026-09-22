@@ -1,4 +1,5 @@
-#include "../include/io_controllers/gpio_controller.hpp"
+#include "../../include/io_controllers/gpio_controller.hpp"
+#include "../../include/config.hpp"
 #include <chrono>
 #include <spdlog/spdlog.h>
 #include <thread>
@@ -7,7 +8,14 @@
 #include <pigpio.h>
 #endif
 
-GPIOController::GPIOController() { setup_gpio(); }
+GPIOController::GPIOController()
+  : trigger_pin(Config::GPIO_TRIGGER_PIN),
+    echo_pin(Config::GPIO_ECHO_PIN),
+    distance_threshold_cm(Config::TRIGGER_DISTANCE_THRESHOLD_CM),
+    min_distance_cm(Config::MIN_DISTANCE_THRESHOLD_CM),
+    cooldown_seconds(Config::COOLDOWN_SECONDS),
+    is_ready(true),
+    gpio_available(false) { setup_gpio(); }
 GPIOController::~GPIOController() { cleanup(); }
 
 void GPIOController::setup_gpio() {
