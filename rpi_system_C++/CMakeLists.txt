@@ -11,6 +11,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math -DNDEBUG")
 
+option(USE_XNNPACK "Enable XNNPACK delegate for TensorFlow Lite" OFF)
+if(USE_XNNPACK)
+  add_definitions(-DUSE_XNNPACK)
+  # You may need to link libxnnpack.so if it's external to tflite:
+  # set(XNNPACK_LIBS xnnpack)
+endif()
+
 # Define the source files
 set(SOURCES
     src/main.cpp

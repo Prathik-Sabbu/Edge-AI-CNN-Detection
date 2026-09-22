@@ -13,6 +13,10 @@
 #include <tuple>
 #include <vector>
 
+#ifdef USE_XNNPACK
+#include <tensorflow/lite/delegates/xnnpack/xnnpack_delegate.h>
+#endif
+
 AnimalClassifier::AnimalClassifier()
     : model_path(Config::MODEL_PATH), labels_path(Config::LABELS_PATH),
       confidence_threshold(Config::CONFIDENCE_THRESHOLD),
@@ -71,7 +75,18 @@ void AnimalClassifier::load_model() {
   builder(&interpreter);
 
   if (interpreter) {
-    interpreter->SetNumThreads(1); // Utilize all 1 cores on Raspberry Pi
+    interpreter->SetNumThreads(4); // Utilize all 4 cores on Raspberry Pi
+
+#ifdef USE_XNNPACK
+    TfLiteXNNPackDelegateOptions xnnpack_options = TfLiteXNNPackDelegateOptionsDefault();
+    xnnpack_options.num_threads = 4;
+    TfLiteDelegate* xnnpack_delegate = TfLiteXNNPackDelegateCreate(&xnnpack_options);
+    if (interpreter->ModifyGraphWithDelegate(xnnpack_delegate) != kTfLiteOk) {
+      spdlog::warn("Failed to apply XNNPACK delegate.");
+    } else {
+      spdlog::info("Successfully applied XNNPACK delegate.");
+    }
+#endif
   }
 
   if (!interpreter) {
@@ -128,6 +143,7 @@ cv::Mat AnimalClassifier::preprocess_image(const cv::Mat &frame) {
 
   cv::Mat input_data;
   if (input_dtype == kTfLiteFloat32) {
+    // MobileNetV3 expects raw [0, 255] float values, NO normalization needed!
     resized_frame.convertTo(input_data, CV_32FC3);
   } else {
     resized_frame.convertTo(input_data, CV_8UC3);
