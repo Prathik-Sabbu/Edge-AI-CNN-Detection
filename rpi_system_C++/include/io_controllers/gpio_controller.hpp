@@ -15,7 +15,7 @@ private:
   float min_distance_cm;
   float cooldown_seconds;
 
-  std::chrono::system_clock::time_point last_trigger_time;
+  std::chrono::steady_clock::time_point last_trigger_time;
   bool is_ready = true;
   bool gpio_available = false;
 
