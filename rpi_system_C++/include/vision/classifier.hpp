@@ -12,10 +12,6 @@
 #include <tuple>
 #include <vector>
 
-#ifdef USE_XNNPACK
-#include <tensorflow/lite/tflite_with_xnnpack_optional.h>
-#endif
-
 
 class AnimalClassifier {
 private:
@@ -29,9 +25,8 @@ private:
   bool is_mock_mode = false;
   std::unique_ptr<tflite::FlatBufferModel> model;
 
-#ifdef USE_XNNPACK
-  decltype(tflite::MaybeCreateXNNPACKDelegate()) xnnpack_delegate = nullptr;
-#endif
+  // Generic keeper for the delegate to avoid polluting header with missing types
+  std::shared_ptr<void> delegate_keeper;
 
   void load_labels();
   void load_model();

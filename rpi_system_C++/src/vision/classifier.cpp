@@ -78,10 +78,13 @@ void AnimalClassifier::load_model() {
     interpreter->SetNumThreads(4); // Utilize all 4 cores on Raspberry Pi
 
 #ifdef USE_XNNPACK
-    xnnpack_delegate = tflite::MaybeCreateXNNPACKDelegate();
-    if (xnnpack_delegate) {
-      if (interpreter->ModifyGraphWithDelegate(xnnpack_delegate.get()) == kTfLiteOk) {
+    // Debian's specific signature for this wrapper
+    auto delegate_ptr = tflite::MaybeCreateXNNPACKDelegate(nullptr, {});
+    if (delegate_ptr) {
+      if (interpreter->ModifyGraphWithDelegate(delegate_ptr.get()) == kTfLiteOk) {
         spdlog::info("Successfully applied XNNPACK delegate using Debian wrapper.");
+        // Store in our generic keeper to keep it alive
+        delegate_keeper = std::shared_ptr<void>(delegate_ptr.release(), delegate_ptr.get_deleter());
       } else {
         spdlog::warn("XNNPACK delegate created but ModifyGraphWithDelegate failed.");
       }
