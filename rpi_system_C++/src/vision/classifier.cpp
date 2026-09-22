@@ -69,6 +69,10 @@ void AnimalClassifier::load_model() {
   tflite::InterpreterBuilder builder(*model, resolver);
   builder(&interpreter);
 
+  if (interpreter) {
+    interpreter->SetNumThreads(4); // Utilize all 4 cores on Raspberry Pi
+  }
+
   if (!interpreter) {
     spdlog::error("Failed to construct TFLite interpreter. Falling back to "
                   "SIMULATION MODE.");

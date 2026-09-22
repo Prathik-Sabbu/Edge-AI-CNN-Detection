@@ -5,6 +5,12 @@ project(EdgeAICNNDetection VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enforce Release mode for O3 optimization (Massive performance boost)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math -DNDEBUG")
+
 # Define the source files
 set(SOURCES
     src/main.cpp
