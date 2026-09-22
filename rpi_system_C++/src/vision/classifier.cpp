@@ -39,9 +39,9 @@ void AnimalClassifier::load_labels() {
       labels = {"Cat", "Dog", "Bird", "Wild Animal"};
     }
   } else {
-    spd::warn("Labels file not found at {}. Using default classes.",
-              labels_path);
-    labels = [ "Cat", "Dog", "Bird", "Wild Animal" ];
+    spdlog::warn("Labels file not found at {}. Using default classes.",
+                 labels_path);
+    labels = { "Cat", "Dog", "Bird", "Wild Animal" };
   }
 }
 
@@ -56,7 +56,7 @@ void AnimalClassifier::load_model() {
     return;
   }
 
-  model = tflite::FlatBufferModel::BuildFromFile(model_path);
+  model = tflite::FlatBufferModel::BuildFromFile(model_path.c_str());
   if (!model) {
     spdlog::warn("Failed to load TFLite model from '{}'. Falling back to "
                  "SIMULATION MODE.",
