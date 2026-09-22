@@ -16,7 +16,8 @@
 AnimalClassifier::AnimalClassifier()
     : model_path(Config::MODEL_PATH), labels_path(Config::LABELS_PATH),
       confidence_threshold(Config::CONFIDENCE_THRESHOLD),
-      enable_roi_crop(Config::ENABLE_ROI_CROP), roi_crop_scale(Config::ROI_CROP_SCALE) {
+      enable_roi_crop(Config::ENABLE_ROI_CROP),
+      roi_crop_scale(Config::ROI_CROP_SCALE) {
   load_labels();
   load_model();
 }
@@ -41,7 +42,7 @@ void AnimalClassifier::load_labels() {
   } else {
     spdlog::warn("Labels file not found at {}. Using default classes.",
                  labels_path);
-    labels = { "Cat", "Dog", "Bird", "Wild Animal" };
+    labels = {"Cat", "Dog", "Bird", "Wild Animal"};
   }
 }
 
@@ -70,7 +71,7 @@ void AnimalClassifier::load_model() {
   builder(&interpreter);
 
   if (interpreter) {
-    interpreter->SetNumThreads(4); // Utilize all 4 cores on Raspberry Pi
+    interpreter->SetNumThreads(1); // Utilize all 1 cores on Raspberry Pi
   }
 
   if (!interpreter) {
