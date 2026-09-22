@@ -27,13 +27,14 @@ void GPIOController::setup_gpio() {
   }
 
   // Initialize the input and output pins
-  gpioSetMode(trigger_pin, PI_OUTPUT) gpioSetMode(echo_pin, PI_INPUT)
+  gpioSetMode(trigger_pin, PI_OUTPUT);
+  gpioSetMode(echo_pin, PI_INPUT);
 
-      // set Output pin to 0 so it doesnt output a pulse yet
-      gpioWrite(trigger_pin, 0)
+  // set Output pin to 0 so it doesnt output a pulse yet
+  gpioWrite(trigger_pin, 0);
 
-      // sensor settling time (500ms)
-      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  // sensor settling time (500ms)
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   gpio_available = true;
   spdlog::info("Raspberry Pi GPIO initialized. Trig=BCM{}, Echo=BCM{}",
@@ -48,42 +49,45 @@ void GPIOController::setup_gpio() {
 
 std::optional<float> GPIOController::measure_distance_cm() {
   if (!gpio_available) {
-    return 25.0
+    return 25.0f;
   }
 
+#ifdef __arm__
   // send a 10 micro second trigger pulse
   gpioWrite(trigger_pin, 1);
   gpioDelay(10); // sleep for 10 micro seconds
   gpioWrite(trigger_pin, 0);
 
-  float pulse_start = gpioTick();
-  float timeout_start = pulse_start;
+  uint32_t pulse_start = gpioTick();
+  uint32_t timeout_start = pulse_start;
 
   // wait for echo to start
   while (gpioRead(echo_pin) == 0) {
     pulse_start = gpioTick();
-    // 40ms timeout
-    if pulse_start
-      -timout_start > 0.04 {
-        return nullptr;
-      }
+    // 40ms timeout (40000 us)
+    if ((pulse_start - timeout_start) > 40000) {
+      return std::nullopt;
+    }
   }
-  float pulse_end = pulse_start;
-  float timeout_echo = pulse_start;
+  
+  uint32_t pulse_end = pulse_start;
+  uint32_t timeout_echo = pulse_start;
 
   // wait for echo to end
   while (gpioRead(echo_pin) == 1) {
     pulse_end = gpioTick();
-    if pulse_end
-      -timeout_echo > 0.04 {
-        return nullptr;
-      }
+    if ((pulse_end - timeout_echo) > 40000) {
+      return std::nullopt;
+    }
   }
 
-  // calculate distance traveld
-  float pulse_duration = pulse_end - pulse_start;
-  float distance = (pulse_duration * 34300) /
-                   2.0 return std::round(distance * 10.0f) / 10.0f;
+  // calculate distance traveled (speed of sound 34300 cm/s = 0.0343 cm/us)
+  float pulse_duration = static_cast<float>(pulse_end - pulse_start);
+  float distance = (pulse_duration * 0.0343f) / 2.0f;
+  return std::round(distance * 10.0f) / 10.0f;
+#else
+  return std::nullopt;
+#endif
 }
 
 bool GPIOController::check_for_trigger() {
@@ -97,21 +101,24 @@ bool GPIOController::check_for_trigger() {
 
   // ready message after cooldown
   if (!is_ready) {
-    spdlog::info("Sensor ready for next trigger.") is_ready = true
+    spdlog::info("Sensor ready for next trigger.");
+    is_ready = true;
   }
 
   // measure distance
-  float distance = measure_distance_cm();
+  std::optional<float> distance = measure_distance_cm();
 
   // evaluate detection threashold
   if (distance.has_value()) {
     float d = distance.value();
     if ((min_distance_cm <= d) && (d <= distance_threshold_cm)) {
-      spdlog::info("Direct GPIO Trigger: Object detected at {} cm!", distance)
-          last_trigger_time = current_time is_ready = false return true
+      spdlog::info("Direct GPIO Trigger: Object detected at {} cm!", d);
+      last_trigger_time = now;
+      is_ready = false;
+      return true;
     }
   }
-  return false
+  return false;
 }
 
 void GPIOController::cleanup() {
