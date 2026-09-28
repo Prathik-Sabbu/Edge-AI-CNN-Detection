@@ -19,7 +19,9 @@ set(TFLITE_LIB "${TFLITE_PREBUILT_DIR}/libtensorflow-lite.a")
 
 # Glob every third-party static library XNNPACK/Abseil/ruy/etc. pulled in,
 # instead of listing ~115 files by hand.
-file(GLOB_RECURSE TFLITE_THIRDPARTY_LIBS "${TFLITE_PREBUILT_DIR}/libs/*.a")
+file(GLOB_RECURSE TFLITE_THIRDPARTY_LIBS_ALL "${TFLITE_PREBUILT_DIR}/libs/*.a")
+list(FILTER TFLITE_THIRDPARTY_LIBS_ALL EXCLUDE REGEX "fft2d")
+set(TFLITE_THIRDPARTY_LIBS ${TFLITE_THIRDPARTY_LIBS_ALL})
 
 set(SOURCES
     src/main.cpp
