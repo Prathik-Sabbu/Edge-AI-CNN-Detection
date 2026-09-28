@@ -15,10 +15,9 @@ if(USE_XNNPACK)
 endif()
 
 set(TFLITE_PREBUILT_DIR "/home/prathiksabbu/tflite_prebuilt")
-set(TFLITE_LIB "${TFLITE_PREBUILT_DIR}/libtensorflow-lite.a")
+set(TFLITE_LIB "${TFLITE_PREBUILT_DIR}/libs/libtensorflow-lite.a")
 
-# Glob every third-party static library XNNPACK/Abseil/ruy/etc. pulled in,
-# instead of listing ~115 files by hand.
+# Glob every third-party static library XNNPACK/Abseil/ruy/etc. pulled in
 file(GLOB_RECURSE TFLITE_THIRDPARTY_LIBS_ALL "${TFLITE_PREBUILT_DIR}/libs/*.a")
 list(FILTER TFLITE_THIRDPARTY_LIBS_ALL EXCLUDE REGEX "fft4f2d")
 set(TFLITE_THIRDPARTY_LIBS ${TFLITE_THIRDPARTY_LIBS_ALL})
@@ -33,10 +32,12 @@ set(SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
+# UPDATED: Replaced old tflite_thirdparty paths with the new _deps paths
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${TFLITE_PREBUILT_DIR}
-    ${TFLITE_PREBUILT_DIR}/tflite_thirdparty/flatbuffers/include
+    ${TFLITE_PREBUILT_DIR}/_deps/flatbuffers-src/include
+    ${TFLITE_PREBUILT_DIR}/_deps/abseil-cpp-src
 )
 
 find_package(OpenCV REQUIRED)
@@ -68,10 +69,12 @@ set(BENCHMARK_SOURCES
 
 add_executable(benchmark_app ${BENCHMARK_SOURCES})
 
+# UPDATED: Replaced old tflite_thirdparty paths with the new _deps paths
 target_include_directories(benchmark_app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${TFLITE_PREBUILT_DIR}
-    ${TFLITE_PREBUILT_DIR}/tflite_thirdparty/flatbuffers/include
+    ${TFLITE_PREBUILT_DIR}/_deps/flatbuffers-src/include
+    ${TFLITE_PREBUILT_DIR}/_deps/abseil-cpp-src
 )
 
 target_link_libraries(benchmark_app PRIVATE
