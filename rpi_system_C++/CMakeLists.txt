@@ -1,3 +1,5 @@
+prathiksabbu@PrathikPi:~/tflite_prebuilt $ cd ~/Edge-AI-CNN-Detection/rpi_system_C++
+cat CMakeLists.txt
 cmake_minimum_required(VERSION 3.14)
 project(EdgeAICNNDetection VERSION 1.0 LANGUAGES CXX)
 
@@ -79,3 +81,4 @@ target_link_libraries(benchmark_app PRIVATE
 if(UNIX AND NOT APPLE)
     target_link_libraries(benchmark_app PRIVATE pigpio pthread)
 endif()
+prathiksabbu@PrathikPi:~/Edge-AI-CNN-Detection/rpi_system_C++ $
