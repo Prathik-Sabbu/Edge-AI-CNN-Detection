@@ -32,11 +32,11 @@ set(SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# UPDATED: Replaced old tflite_thirdparty paths with the new _deps paths
-target_include_directories(${PROJECT_NAME} PRIVATE
+# ADDED BEFORE keyword and fixed flatbuffers path
+target_include_directories(${PROJECT_NAME} BEFORE PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${TFLITE_PREBUILT_DIR}
-    ${TFLITE_PREBUILT_DIR}/_deps/flatbuffers-src/include
+    ${TFLITE_PREBUILT_DIR}/flatbuffers/include
     ${TFLITE_PREBUILT_DIR}/_deps/abseil-cpp-src
 )
 
@@ -69,11 +69,11 @@ set(BENCHMARK_SOURCES
 
 add_executable(benchmark_app ${BENCHMARK_SOURCES})
 
-# UPDATED: Replaced old tflite_thirdparty paths with the new _deps paths
-target_include_directories(benchmark_app PRIVATE
+# ADDED BEFORE keyword and fixed flatbuffers path
+target_include_directories(benchmark_app BEFORE PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${TFLITE_PREBUILT_DIR}
-    ${TFLITE_PREBUILT_DIR}/_deps/flatbuffers-src/include
+    ${TFLITE_PREBUILT_DIR}/flatbuffers/include
     ${TFLITE_PREBUILT_DIR}/_deps/abseil-cpp-src
 )
 
