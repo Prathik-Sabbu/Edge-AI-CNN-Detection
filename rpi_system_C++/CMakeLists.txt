@@ -17,7 +17,6 @@ endif()
 set(TFLITE_PREBUILT_DIR "/home/prathiksabbu/tflite_prebuilt")
 set(TFLITE_LIB "${TFLITE_PREBUILT_DIR}/libs/libtensorflow-lite.a")
 
-# Glob every third-party static library XNNPACK/Abseil/ruy/etc. pulled in
 file(GLOB_RECURSE TFLITE_THIRDPARTY_LIBS_ALL "${TFLITE_PREBUILT_DIR}/libs/*.a")
 list(FILTER TFLITE_THIRDPARTY_LIBS_ALL EXCLUDE REGEX "fft4f2d")
 set(TFLITE_THIRDPARTY_LIBS ${TFLITE_THIRDPARTY_LIBS_ALL})
@@ -32,7 +31,6 @@ set(SOURCES
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# ADDED BEFORE keyword and fixed flatbuffers path
 target_include_directories(${PROJECT_NAME} BEFORE PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${TFLITE_PREBUILT_DIR}
@@ -69,7 +67,6 @@ set(BENCHMARK_SOURCES
 
 add_executable(benchmark_app ${BENCHMARK_SOURCES})
 
-# ADDED BEFORE keyword and fixed flatbuffers path
 target_include_directories(benchmark_app BEFORE PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${TFLITE_PREBUILT_DIR}
