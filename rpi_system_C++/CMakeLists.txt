@@ -17,6 +17,10 @@ endif()
 set(TFLITE_PREBUILT_DIR "/home/prathiksabbu/tflite_prebuilt")
 set(TFLITE_LIB "${TFLITE_PREBUILT_DIR}/libtensorflow-lite.a")
 
+# Glob every third-party static library XNNPACK/Abseil/ruy/etc. pulled in,
+# instead of listing ~115 files by hand.
+file(GLOB_RECURSE TFLITE_THIRDPARTY_LIBS "${TFLITE_PREBUILT_DIR}/libs/*.a")
+
 set(SOURCES
     src/main.cpp
     src/vision/camera.cpp
@@ -39,9 +43,13 @@ find_package(spdlog REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE
     ${OpenCV_LIBS}
     spdlog::spdlog
+    -Wl,--start-group
     ${TFLITE_LIB}
+    ${TFLITE_THIRDPARTY_LIBS}
+    -Wl,--end-group
     pthread
     dl
+    m
 )
 
 if(UNIX AND NOT APPLE)
@@ -67,9 +75,13 @@ target_include_directories(benchmark_app PRIVATE
 target_link_libraries(benchmark_app PRIVATE
     ${OpenCV_LIBS}
     spdlog::spdlog
+    -Wl,--start-group
     ${TFLITE_LIB}
+    ${TFLITE_THIRDPARTY_LIBS}
+    -Wl,--end-group
     pthread
     dl
+    m
 )
 
 if(UNIX AND NOT APPLE)
